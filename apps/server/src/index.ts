@@ -1,5 +1,10 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+
+// Local `.env` (PORT, CORS_ORIGINS, TURN keys). Hosted platforms inject env
+// vars directly; values already in the environment win over the file.
+if (existsSync(".env")) process.loadEnvFile(".env");
 import cors from "cors";
 import express from "express";
 import { Server } from "socket.io";

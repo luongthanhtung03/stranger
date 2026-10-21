@@ -9,7 +9,8 @@
     "dev": "concurrently -n web,server -c magenta,cyan \"npm run dev -w apps/web\" \"npm run dev -w apps/server\"",
     "build": "npm run build -w packages/shared && npm run build -w apps/server && npm run build -w apps/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "npm run lint -w apps/web"
+    "lint": "npm run lint -w apps/web",
+    "tunnel": "node scripts/tunnel.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

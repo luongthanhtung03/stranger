@@ -23,6 +23,20 @@ Mở hai tab trình duyệt (một tab ẩn danh để có deviceId khác) → n
 
 Test server: `cd apps/server && npm run dev` rồi `node test/signaling.test.mjs` (mặc định trỏ tới :4010, đặt `URL=http://localhost:4000` nếu cần).
 
+## Cho bạn bè vào thử (tunnel)
+
+Điện thoại chỉ cho mở camera qua HTTPS, nên không dùng được IP LAN trực tiếp. Lệnh này mở 2 Cloudflare quick tunnel (miễn phí, không cần tài khoản) rồi tự chạy web + server:
+
+```bash
+npm run tunnel
+# nếu cổng 3000/4000 đang bận:
+WEB_PORT=3200 SERVER_PORT=4200 npm run tunnel
+```
+
+Gửi link `https://….trycloudflare.com` in ra màn hình cho bạn bè. Giữ cửa sổ mở; `Ctrl+C` để tắt (env files tự trả về localhost). Link đổi mỗi lần chạy. Cần `cloudflared.exe` trong thư mục `.tools/` (tải từ https://github.com/cloudflare/cloudflared/releases).
+
+Nếu ai đó ở 4G bị kẹt "Đang kết nối…", điền `CF_TURN_KEY_ID` / `CF_TURN_KEY_TOKEN` trong `apps/server/.env` (Cloudflare Realtime TURN, miễn phí).
+
 ## Deploy (miễn phí)
 
 | Phần | Nơi | Ghi chú |
