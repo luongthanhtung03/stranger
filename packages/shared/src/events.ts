@@ -13,6 +13,11 @@ export interface PeerInfo {
 
 export type FriendStatus = "online" | "busy" | "offline";
 
+/** Answer to `auth:google`. `domain` = not a student (.edu.vn) email. */
+export type AuthResult =
+  | { ok: true; session: string; email: string; name: string }
+  | { ok: false; error: "disabled" | "invalid" | "domain" };
+
 export type IceServer = {
   urls: string | string[];
   username?: string;
@@ -41,7 +46,11 @@ export interface ClientToServerEvents {
     tags: Tag[];
     school: string | null;
     blocked: string[];
+    /** Server-signed session from `auth:google`; only checked when login is on. */
+    session?: string | null;
   }) => void;
+  /** Exchange a Google ID token (from Google Identity Services) for a session. */
+  "auth:google": (payload: { credential: string }, ack: (result: AuthResult) => void) => void;
   "queue:join": () => void;
   /** Latest mini-game result while waiting; shown to the partner as the first chat line. */
   "game:score": (payload: GameScore) => void;
@@ -63,6 +72,8 @@ export interface ClientToServerEvents {
 /** Events the server emits to the client. */
 export interface ServerToClientEvents {
   presence: (payload: { online: number; waiting: number }) => void;
+  /** Login is on and `hello` had no valid session; nothing else works until it does. */
+  "auth:required": () => void;
   /** The user skipped too fast; they are queued automatically once `until` passes. */
   "queue:cooldown": (payload: { until: number }) => void;
   banned: (payload: { until: number }) => void;
@@ -105,6 +116,9 @@ export const REMATCH_COOLDOWN_MS = 10 * 60 * 1000;
 export const REPORTS_TO_BAN = 3;
 export const BAN_MS = 24 * 60 * 60 * 1000;
 export const NAME_MAX = 20;
+/** Only student emails may sign in (when login is enabled). */
+export const ALLOWED_EMAIL_SUFFIX = ".edu.vn";
+export const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 export const TAGS = [
   "học bài",
   "tiếng Anh",

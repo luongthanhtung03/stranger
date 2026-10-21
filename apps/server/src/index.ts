@@ -24,6 +24,7 @@ import {
   type ReportReason,
   type ServerToClientEvents,
 } from "@stranger/shared";
+import { authEnabled, signInWithGoogle, verifySession } from "./auth.js";
 import { dequeue, enqueue, queueSize } from "./matchmaker.js";
 import { banUntil, report } from "./moderation.js";
 import {
@@ -80,9 +81,25 @@ function cleanName(raw: string) {
 }
 
 const REPORT_REASONS: ReportReason[] = ["nsfw", "harass", "spam", "other"];
+authEnabled(); // fail fast on a half-configured login
 
 io.on("connection", (socket) => {
-  socket.on("hello", ({ deviceId, name, tags, school, blocked }) => {
+  socket.on("auth:google", async (payload, ack) => {
+    if (typeof ack !== "function") return;
+    ack(await signInWithGoogle(payload?.credential));
+  });
+
+  socket.on("hello", ({ deviceId: rawDeviceId, name, tags, school, blocked, session }) => {
+    let deviceId = rawDeviceId;
+    if (authEnabled()) {
+      // Signed in: the account is the identity, so bans and friends follow it.
+      const s = verifySession(session);
+      if (!s) {
+        socket.emit("auth:required");
+        return;
+      }
+      deviceId = s.uid;
+    }
     if (typeof deviceId !== "string" || deviceId.length < 8 || deviceId.length > 64) {
       socket.disconnect(true);
       return;

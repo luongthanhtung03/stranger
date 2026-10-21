@@ -117,6 +117,10 @@ ok(!rematched, "same pair not rematched within cooldown");
 a.emit("queue:leave");
 b.emit("queue:leave");
 
+// login is off by default (public beta): no auth:required, Google sign-in refused
+const authRes = await a.timeout(3000).emitWithAck("auth:google", { credential: "x" });
+ok(authRes.ok === false && authRes.error === "disabled", "auth:google disabled in the beta");
+
 // --- 2. friend invite → private room ----------------------------------------
 const invP = once(b, "friend:invite");
 a.emit("friend:invite", { deviceId: b.deviceId });

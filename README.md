@@ -37,6 +37,16 @@ Gửi link `https://….trycloudflare.com` in ra màn hình cho bạn bè. Giữ
 
 Nếu ai đó ở 4G bị kẹt "Đang kết nối…", điền `CF_TURN_KEY_ID` / `CF_TURN_KEY_TOKEN` trong `apps/server/.env` (Cloudflare Realtime TURN, miễn phí).
 
+## Đăng nhập Google (ẩn trong bản beta)
+
+Đã code xong nhưng **tắt mặc định**: bản beta không hiện nút, không tải script của Google. Khi bật, chỉ email sinh viên `.edu.vn` được vào, và lệnh cấm/bạn bè gắn với tài khoản thay vì thiết bị.
+
+1. Google Cloud Console → APIs & Services → Credentials → OAuth client ID (Web). Thêm domain web vào *Authorized JavaScript origins* (vd. `http://localhost:3000`).
+2. `apps/server/.env`: `AUTH_ENABLED=true`, `GOOGLE_CLIENT_ID=…`, `SESSION_SECRET=` (32+ ký tự ngẫu nhiên).
+3. `apps/web/.env.local`: `NEXT_PUBLIC_AUTH_ENABLED=true`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID=…` (cùng client id).
+
+Test: chạy server với các biến trên ở `PORT=4011`, rồi `SESSION_SECRET=… npx tsx test/auth.test.mjs`.
+
 ## Deploy (miễn phí)
 
 | Phần | Nơi | Ghi chú |

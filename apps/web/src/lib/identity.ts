@@ -10,6 +10,7 @@ const KEYS = {
   school: "stranger.school",
   blocked: "stranger.blocked",
   dataSaver: "stranger.dataSaver",
+  session: "stranger.session",
 } as const;
 
 export interface Friend extends PeerInfo {
@@ -50,6 +51,14 @@ export const getSchool = () => read<string | null>(KEYS.school, null);
 export const setSchool = (id: string | null) => write(KEYS.school, id);
 export const getDataSaver = () => read<boolean>(KEYS.dataSaver, false);
 export const setDataSaver = (v: boolean) => write(KEYS.dataSaver, v);
+
+/** Signed-in account (only used when login is enabled). */
+export interface Account {
+  session: string;
+  email: string;
+}
+export const getAccount = () => read<Account | null>(KEYS.session, null);
+export const setAccount = (a: Account | null) => write(KEYS.session, a);
 
 export const getFriends = () => read<Friend[]>(KEYS.friends, []);
 export function addFriend(peer: PeerInfo) {

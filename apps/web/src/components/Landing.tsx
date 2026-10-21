@@ -2,13 +2,16 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { Camera, ChevronDown, GraduationCap, Users } from "lucide-react";
+import { Camera, ChevronDown, GraduationCap, LogOut, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { NAME_MAX, TAGS, schoolById } from "@stranger/shared";
+import { GoogleSignIn } from "./GoogleSignIn";
 import { SchoolPicker } from "./SchoolPicker";
 import { ThemeToggle } from "./ThemeToggle";
 import { t } from "@/i18n/vi";
+import { AUTH_ENABLED } from "@/lib/auth-config";
 import {
+  getAccount,
   getName,
   getSchool,
   getTags,
@@ -30,11 +33,12 @@ const rise = {
 
 export function Landing() {
   const media = useMedia();
-  const { presence, connect, joinQueue, connected } = useSocket();
+  const { presence, connect, joinQueue, connected, authRequired, signOut } = useSocket();
   const [name, setName] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [school, setSchool] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -44,6 +48,7 @@ export function Landing() {
     setName(getName());
     setTags(getTags());
     setSchool(getSchool());
+    setEmail(getAccount()?.email ?? null);
     setHydrated(true);
     connect(); // presence count + invites while on the landing page
   }, [connect]);
@@ -68,7 +73,14 @@ export function Landing() {
   };
   const schoolInfo = schoolById(school);
 
-  const canStart = name.trim().length > 0 && !!media.stream;
+  // Always true in the beta; with login on, the start button waits for a session.
+  const signedIn = !AUTH_ENABLED || (!!email && !authRequired);
+  const onSignedIn = (googleName: string) => {
+    setEmail(getAccount()?.email ?? null);
+    if (!name.trim() && googleName) setName(googleName.slice(0, NAME_MAX));
+  };
+
+  const canStart = signedIn && name.trim().length > 0 && !!media.stream;
 
   const start = async () => {
     if (!name.trim()) return;
@@ -188,17 +200,41 @@ export function Landing() {
         </motion.div>
 
         <motion.div variants={rise} className="pt-2">
-          <motion.button
-            whileTap={{ scale: 0.96 }}
-            whileHover={{ scale: 1.01 }}
-            disabled={!canStart}
-            onClick={() => void start()}
-            className={`grad relative w-full rounded-full py-4 text-lg font-extrabold text-white transition-opacity ${
-              canStart ? "glow pulse-ring" : "opacity-40"
-            }`}
-          >
-            {t.start}
-          </motion.button>
+          {!signedIn && hydrated ? (
+            <GoogleSignIn onSignedIn={onSignedIn} />
+          ) : (
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              whileHover={{ scale: 1.01 }}
+              disabled={!canStart}
+              onClick={() => void start()}
+              className={`grad relative w-full rounded-full py-4 text-lg font-extrabold text-white transition-opacity ${
+                canStart ? "glow pulse-ring" : "opacity-40"
+              }`}
+            >
+              {t.start}
+            </motion.button>
+          )}
+          {AUTH_ENABLED && signedIn && email && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mt-3 flex items-center justify-center gap-2 text-xs text-muted"
+            >
+              <span className="truncate">{t.signedInAs(email)}</span>
+              <button
+                onClick={() => {
+                  signOut();
+                  setEmail(null);
+                }}
+                aria-label={t.signOut}
+                className="flex items-center gap-1 rounded-full bg-chip px-2 py-1 font-semibold text-fg/80"
+              >
+                <LogOut size={12} />
+                {t.signOut}
+              </button>
+            </motion.div>
+          )}
         </motion.div>
       </div>
       <SchoolPicker open={pickerOpen} value={school} onClose={() => setPickerOpen(false)} onPick={pickSchool} />

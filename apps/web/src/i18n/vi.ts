@@ -72,6 +72,12 @@ export const t = {
   back: "Quay lại",
   metAt: (d: string) => `Gặp ${d}`,
 
+  signInTitle: "Đăng nhập bằng email sinh viên",
+  signInSub: "Chỉ nhận email trường (.edu.vn) — để ai cũng là sinh viên thật.",
+  signInDomain: "Email này không phải email sinh viên (.edu.vn). Thử tài khoản trường nhé.",
+  signInFailed: "Đăng nhập không thành công, thử lại nhé.",
+  signedInAs: (email: string) => `Đã đăng nhập: ${email}`,
+  signOut: "Đăng xuất",
   banned: "Bạn bị tạm khoá 24 giờ do nhiều báo cáo.",
   disconnected: "Mất kết nối máy chủ, đang thử lại…",
 } as const;

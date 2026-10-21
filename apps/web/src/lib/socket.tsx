@@ -3,13 +3,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import type {
+  AuthResult,
   ClientToServerEvents,
   IceServer,
   PeerInfo,
   RoomEndReason,
   ServerToClientEvents,
 } from "@stranger/shared";
-import { getBlocked, getDeviceId, getName, getSchool, getTags } from "./identity";
+import { getAccount, getBlocked, getDeviceId, getName, getSchool, getTags, setAccount } from "./identity";
 
 export type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -38,6 +39,11 @@ interface Ctx {
   lastEnd: { reason: RoomEndReason; wasPrivate: boolean; at: number } | null;
   invite: Invite | null;
   cooldownUntil: number | null;
+  /** Login is on and we have no valid session (always false in the beta). */
+  authRequired: boolean;
+  /** Trades a Google ID token for a session, stores it and re-sends `hello`. */
+  signInWithGoogle: (credential: string) => Promise<AuthResult>;
+  signOut: () => void;
   /** (Re)connects and sends `hello` with the current identity. */
   connect: () => void;
   joinQueue: () => void;
@@ -57,6 +63,7 @@ function sendHello(socket: AppSocket) {
     tags: getTags(),
     school: getSchool(),
     blocked: getBlocked(),
+    session: getAccount()?.session ?? null,
   });
 }
 
@@ -73,6 +80,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   const [lastEnd, setLastEnd] = useState<Ctx["lastEnd"]>(null);
   const [invite, setInvite] = useState<Invite | null>(null);
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [authRequired, setAuthRequired] = useState(false);
   const matchRef = useRef<Match | null>(null);
   const queuedRef = useRef(false);
 
@@ -119,6 +127,12 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     };
     const onInvite = (inv: Invite) => setInvite(inv);
     const onCooldown = ({ until }: { until: number }) => setCooldownUntil(until);
+    const onAuthRequired = () => {
+      setAccount(null); // missing or expired: drop it so the sign-in button shows
+      setAuthRequired(true);
+      queuedRef.current = false;
+      setQueued(false);
+    };
 
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
@@ -128,7 +142,9 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     socket.on("room:ended", onEnded);
     socket.on("friend:invite", onInvite);
     socket.on("queue:cooldown", onCooldown);
+    socket.on("auth:required", onAuthRequired);
     return () => {
+      socket.off("auth:required", onAuthRequired);
       socket.off("queue:cooldown", onCooldown);
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
@@ -170,6 +186,31 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
   const dismissInvite = useCallback(() => setInvite(null), []);
 
+  const signInWithGoogle = useCallback(
+    async (credential: string): Promise<AuthResult> => {
+      if (!socket.connected) socket.connect();
+      let res: AuthResult;
+      try {
+        res = await socket.timeout(10_000).emitWithAck("auth:google", { credential });
+      } catch {
+        return { ok: false, error: "invalid" };
+      }
+      if (res.ok) {
+        setAccount({ session: res.session, email: res.email });
+        setAuthRequired(false);
+        sendHello(socket);
+      }
+      return res;
+    },
+    [socket],
+  );
+
+  const signOut = useCallback(() => {
+    setAccount(null);
+    setAuthRequired(true);
+    socket.disconnect(); // the server forgets us; reconnecting asks for a session again
+  }, [socket]);
+
   const value: Ctx = {
     socket,
     connected,
@@ -180,6 +221,9 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     lastEnd,
     invite,
     cooldownUntil,
+    authRequired,
+    signInWithGoogle,
+    signOut,
     connect,
     joinQueue,
     leaveQueue,
