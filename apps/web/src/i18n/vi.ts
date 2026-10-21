@@ -10,6 +10,12 @@ export const t = {
   cameraDenied: "Không mở được camera. Kiểm tra quyền truy cập trong trình duyệt rồi thử lại.",
   online: (n: number) => `${n} người đang online`,
   friends: "Đã gặp",
+  themeLight: "Giao diện sáng",
+  themeDark: "Giao diện tối",
+  school: "Trường (không bắt buộc)",
+  schoolTitle: "Bạn học trường nào?",
+  schoolSearch: "Tìm trường…",
+  schoolNone: "Không chọn",
 
   queueTitle: "Đang tìm người lạ…",
   queueHints: ["Đang tìm…", "Sắp có người rồi…", "Chỉnh lại ánh sáng chút nhé 💡", "Hít thở sâu nào 😌"],
@@ -25,7 +31,9 @@ export const t = {
   connect: "Kết nối — cả hai cùng bấm để lưu nhau",
   connectPending: "Đã gửi ❤",
   connected: (name: string) => `Đã kết nối với ${name} ✨`,
-  nextCard: "Câu khác",
+  chat: "Nhắn tin",
+  chatPlaceholder: "Nhắn gì đó…",
+  send: "Gửi",
   extendAsk: (d: string) => `Thêm ${d}?`,
   extendYes: (d: string) => `+${d}`,
   duration: (ms: number) => (ms >= 60_000 ? `${Math.round(ms / 60_000)} phút` : `${Math.round(ms / 1000)}s`),
@@ -55,6 +63,7 @@ export const t = {
   callAgain: "Gọi lại",
   offline: "Offline",
   onlineTag: "Online",
+  busyTag: "Đang bận",
   inviteSent: "Đã gửi lời mời…",
   inviteDeclined: "Người kia đang bận.",
   inviteFrom: (name: string) => `${name} muốn gọi lại với bạn`,
@@ -65,10 +74,4 @@ export const t = {
 
   banned: "Bạn bị tạm khoá 24 giờ do nhiều báo cáo.",
   disconnected: "Mất kết nối máy chủ, đang thử lại…",
-  categories: {
-    campus: "Trường lớp",
-    funny: "Vui vẻ",
-    deep: "Sâu sắc",
-    wyr: "Bạn chọn gì?",
-  },
 } as const;

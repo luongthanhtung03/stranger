@@ -26,7 +26,7 @@ export function RoundTimer({ endsAt, total = ROUND_MS }: { endsAt: number; total
       className="glass flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3"
     >
       <svg width="46" height="46" viewBox="0 0 46 46" className="-rotate-90">
-        <circle cx="23" cy="23" r={R} stroke="rgba(255,255,255,.12)" strokeWidth="4" fill="none" />
+        <circle cx="23" cy="23" r={R} stroke="var(--chip)" strokeWidth="4" fill="none" />
         <circle
           cx="23"
           cy="23"

@@ -2,10 +2,11 @@
 
 import { motion } from "framer-motion";
 import { Avatar } from "./Avatar";
+import { SchoolBadge } from "./SchoolPicker";
 import { t } from "@/i18n/vi";
 
 // Two avatars slide in from the sides and bump — shown briefly over the room.
-export function MatchIntro({ me, peer }: { me: string; peer: string }) {
+export function MatchIntro({ me, peer, school }: { me: string; peer: string; school: string | null }) {
   const spring = { type: "spring" as const, stiffness: 320, damping: 16 };
   return (
     <motion.div
@@ -33,9 +34,10 @@ export function MatchIntro({ me, peer }: { me: string; peer: string }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
-        className="mt-1 text-sm text-muted"
+        className="mt-1 flex items-center gap-2 text-sm text-muted"
       >
         {peer}
+        <SchoolBadge id={school} />
       </motion.p>
     </motion.div>
   );

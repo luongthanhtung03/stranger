@@ -4,6 +4,8 @@ import "./globals.css";
 import { SocketProvider } from "@/lib/socket";
 import { MediaProvider } from "@/lib/media-context";
 import { InviteToast } from "@/components/InviteToast";
+import { ThemeProvider } from "@/lib/theme";
+import { THEME_COLOR, themeScript } from "@/lib/theme-script";
 
 const bvp = Be_Vietnam_Pro({
   variable: "--font-bvp",
@@ -18,7 +20,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0b12",
+  themeColor: THEME_COLOR.dark,
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -27,14 +29,19 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="vi" className={`${bvp.variable} h-full antialiased`}>
+    <html lang="vi" data-theme="dark" suppressHydrationWarning className={`${bvp.variable} h-full antialiased`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="min-h-full flex flex-col">
-        <SocketProvider>
-          <MediaProvider>
-            {children}
-            <InviteToast />
-          </MediaProvider>
-        </SocketProvider>
+        <ThemeProvider>
+          <SocketProvider>
+            <MediaProvider>
+              {children}
+              <InviteToast />
+            </MediaProvider>
+          </SocketProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

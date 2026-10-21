@@ -85,13 +85,13 @@ export function Queue() {
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="absolute rounded-full border border-white/15"
+            className="absolute rounded-full border border-chip-strong"
             style={{ width: 100 * i, height: 100 * i, opacity: 1 - i * 0.18 }}
           />
         ))}
         {/* crosshair */}
-        <div className="absolute h-[300px] w-px bg-white/10" />
-        <div className="absolute h-px w-[300px] bg-white/10" />
+        <div className="absolute h-[300px] w-px bg-chip-strong" />
+        <div className="absolute h-px w-[300px] bg-chip-strong" />
         {/* sonar ripples */}
         <div className="sonar h-[300px] w-[300px]" />
         <div className="sonar h-[300px] w-[300px]" style={{ animationDelay: "1.2s" }} />

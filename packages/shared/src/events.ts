@@ -7,13 +7,11 @@ export interface PeerInfo {
   deviceId: string;
   name: string;
   tags: Tag[];
+  /** Self-picked id from SCHOOLS; unverified until student login exists. */
+  school: string | null;
 }
 
-export interface Icebreaker {
-  id: string;
-  category: "campus" | "funny" | "deep" | "wyr";
-  text: string;
-}
+export type FriendStatus = "online" | "busy" | "offline";
 
 export type IceServer = {
   urls: string | string[];
@@ -37,9 +35,15 @@ export type RoomEndReason =
 
 /** Events the client emits to the server. */
 export interface ClientToServerEvents {
-  hello: (payload: { deviceId: string; name: string; tags: Tag[]; blocked: string[] }) => void;
+  hello: (payload: {
+    deviceId: string;
+    name: string;
+    tags: Tag[];
+    school: string | null;
+    blocked: string[];
+  }) => void;
   "queue:join": () => void;
-  /** Latest mini-game result while waiting; shown to the partner as the first card. */
+  /** Latest mini-game result while waiting; shown to the partner as the first chat line. */
   "game:score": (payload: GameScore) => void;
   "queue:leave": () => void;
   "rtc:signal": (signal: RtcSignal) => void;
@@ -49,7 +53,7 @@ export interface ClientToServerEvents {
   "room:next": () => void;
   "room:leave": () => void;
   "room:report": (payload: { reason: ReportReason }) => void;
-  "room:card:next": () => void;
+  "room:chat": (payload: { text: string }) => void;
   "friend:invite": (payload: { deviceId: string }) => void;
   "friend:accept": (payload: { inviteId: string }) => void;
   "friend:decline": (payload: { inviteId: string }) => void;
@@ -69,33 +73,34 @@ export interface ServerToClientEvents {
     iceServers: IceServer[];
     endsAt: number;
     private: boolean;
-    card: Icebreaker;
+    /** The peer's queue mini-game result, if they have one to brag about. */
+    brag: string | null;
   }) => void;
   "rtc:signal": (signal: RtcSignal) => void;
   "room:reveal:state": (payload: { me: boolean; peer: boolean; revealed: boolean }) => void;
   "room:timer": (payload: { endsAt: number }) => void;
   "room:extend:state": (payload: { me: boolean; peer: boolean }) => void;
   "room:connected": (payload: { peer: PeerInfo }) => void;
-  "room:card": (payload: { card: Icebreaker }) => void;
+  "room:chat": (payload: { text: string; at: number }) => void;
   "room:ended": (payload: { reason: RoomEndReason }) => void;
   "friend:invite": (payload: { inviteId: string; from: PeerInfo }) => void;
   "friend:invite:result": (payload: { inviteId: string; accepted: boolean }) => void;
-  "friend:status": (payload: { online: Record<string, boolean> }) => void;
+  "friend:status": (payload: { status: Record<string, FriendStatus> }) => void;
 }
 
-// TEST VALUES - restore before launch:
-//   ROUND_MS = 5 * 60 * 1000, EXTEND_MS = 5 * 60 * 1000,
-//   EXTEND_PROMPT_MS = 30 * 1000, NEXT_LOCK_MS = 20 * 1000
-export const ROUND_MS = 15 * 1000;
-export const EXTEND_MS = 15 * 1000;
-export const EXTEND_PROMPT_MS = 10 * 1000;
+export const ROUND_MS = 5 * 60 * 1000;
+export const EXTEND_MS = 5 * 60 * 1000;
+export const EXTEND_PROMPT_MS = 30 * 1000;
 /** "Tiếp" is locked for the first seconds of a room - give the person a chance. */
-export const NEXT_LOCK_MS = 5 * 1000;
+export const NEXT_LOCK_MS = 20 * 1000;
 /** Skipping SKIP_LIMIT rooms within SKIP_WINDOW_MS earns a SKIP_COOLDOWN_MS wait. */
 export const SKIP_LIMIT = 3;
 export const SKIP_WINDOW_MS = 2 * 60 * 1000;
 export const SKIP_COOLDOWN_MS = 20 * 1000;
-export const CARD_INTERVAL_MS = 90 * 1000;
+export const CHAT_MAX = 200;
+/** At most CHAT_RATE messages per CHAT_WINDOW_MS; extra ones are dropped. */
+export const CHAT_RATE = 5;
+export const CHAT_WINDOW_MS = 5 * 1000;
 export const REMATCH_COOLDOWN_MS = 10 * 60 * 1000;
 export const REPORTS_TO_BAN = 3;
 export const BAN_MS = 24 * 60 * 60 * 1000;

@@ -7,6 +7,7 @@ const KEYS = {
   name: "stranger.name",
   tags: "stranger.tags",
   friends: "stranger.friends",
+  school: "stranger.school",
   blocked: "stranger.blocked",
   dataSaver: "stranger.dataSaver",
 } as const;
@@ -45,6 +46,8 @@ export const getName = () => read<string>(KEYS.name, "");
 export const setName = (name: string) => write(KEYS.name, name);
 export const getTags = () => read<string[]>(KEYS.tags, []);
 export const setTags = (tags: string[]) => write(KEYS.tags, tags);
+export const getSchool = () => read<string | null>(KEYS.school, null);
+export const setSchool = (id: string | null) => write(KEYS.school, id);
 export const getDataSaver = () => read<boolean>(KEYS.dataSaver, false);
 export const setDataSaver = (v: boolean) => write(KEYS.dataSaver, v);
 

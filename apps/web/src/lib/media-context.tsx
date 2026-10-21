@@ -27,9 +27,12 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
-  // Not rendered during SSR, so reading localStorage in the initializer is safe.
-  const [dataSaver, setSaver] = useState(() => (typeof window === "undefined" ? false : getDataSaver()));
+  const [dataSaver, setSaver] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Loaded after mount: the provider wraps every page, so SSR renders it too.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setSaver(getDataSaver()), []);
 
   const open = useCallback(async () => {
     if (streamRef.current) return streamRef.current;

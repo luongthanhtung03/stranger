@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
-:root {
+/* Dark ("Neon night") is the default. `data-theme` on <html> picks the page
+   theme; the Room sets data-theme="dark" on itself because its overlays sit on
+   video, so the tokens are scoped to any element, not just :root. */
+:root,
+[data-theme="dark"] {
   --bg: #0b0b12;
   --surface: #14141f;
   --surface-2: #1c1c2a;
@@ -10,6 +14,32 @@
   --accent: #7c3aed;
   --accent-2: #ec4899;
   --glow: rgba(168, 85, 247, 0.35);
+  --glass-bg: rgba(20, 20, 31, 0.6);
+  --chip: rgba(255, 255, 255, 0.1);
+  --chip-strong: rgba(255, 255, 255, 0.15);
+  --inset: rgba(255, 255, 255, 0.06);
+  --grad-text-from: #a78bfa;
+  --orb-opacity: 0.32;
+  --sonar: rgba(196, 140, 255, 0.8);
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --bg: #f6f5fb;
+  --surface: #ffffff;
+  --surface-2: #efedf7;
+  --border: rgba(20, 20, 40, 0.1);
+  --fg: #14141f;
+  --muted: #6b6b80;
+  --glow: rgba(124, 58, 237, 0.28);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --chip: rgba(20, 20, 40, 0.06);
+  --chip-strong: rgba(20, 20, 40, 0.14);
+  --inset: rgba(255, 255, 255, 0.7);
+  --grad-text-from: #7c3aed;
+  --orb-opacity: 0.18;
+  --sonar: rgba(124, 58, 237, 0.55);
+  color-scheme: light;
 }
 
 @theme inline {
@@ -21,6 +51,8 @@
   --color-muted: var(--muted);
   --color-accent: var(--accent);
   --color-accent-2: var(--accent-2);
+  --color-chip: var(--chip);
+  --color-chip-strong: var(--chip-strong);
   --font-sans: var(--font-bvp), system-ui, sans-serif;
   --radius-card: 20px;
 }
@@ -49,18 +81,18 @@ body {
   background-image: linear-gradient(135deg, var(--accent), var(--accent-2));
 }
 .grad-text {
-  background-image: linear-gradient(135deg, #a78bfa, var(--accent-2));
+  background-image: linear-gradient(135deg, var(--grad-text-from), var(--accent-2));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 .glow {
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 0 0 1px var(--inset) inset,
     0 10px 40px -10px var(--glow);
 }
 .glass {
-  background: rgba(20, 20, 31, 0.6);
+  background: var(--glass-bg);
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
   border: 1px solid var(--border);
@@ -71,7 +103,7 @@ body {
   position: absolute;
   border-radius: 9999px;
   filter: blur(70px);
-  opacity: 0.32;
+  opacity: var(--orb-opacity);
   pointer-events: none;
   will-change: transform;
 }
@@ -152,7 +184,7 @@ body {
 .sonar {
   position: absolute;
   border-radius: 9999px;
-  border: 1.5px solid rgba(196, 140, 255, 0.8);
+  border: 1.5px solid var(--sonar);
   box-shadow: 0 0 16px rgba(168, 85, 247, 0.5);
   animation: sonar 2.4s ease-out infinite;
 }
@@ -169,6 +201,26 @@ video {
 }
 .mirror {
   transform: scaleX(-1);
+}
+
+/* Theme switch: a circle grows from the toggle button (View Transitions).
+   theme.tsx sets --reveal-x/y/r before starting the transition. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) {
+  animation: theme-reveal 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes theme-reveal {
+  from { clip-path: circle(0 at var(--reveal-x, 50%) var(--reveal-y, 0)); }
+  to { clip-path: circle(var(--reveal-r, 150vmax) at var(--reveal-x, 50%) var(--reveal-y, 0)); }
+}
+/* Fallback when View Transitions aren't supported */
+html.theme-fade,
+html.theme-fade * {
+  transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

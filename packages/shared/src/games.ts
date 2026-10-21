@@ -1,5 +1,5 @@
 // Mini games played while waiting in the queue. The score travels into the room
-// as the partner's first icebreaker card.
+// as the first line of the partner's chat.
 
 export type GameId = "whack" | "pong" | "billiards";
 
@@ -16,7 +16,7 @@ export const GAME_META: Record<GameId, { title: string; emoji: string; hint: str
   billiards: { title: "Bida 4 lỗ", emoji: "🎱", hint: "Kéo bi trắng ra sau rồi thả — đưa bi hồng vào lỗ" },
 };
 
-/** Card text the *other* person sees about your result; null if nothing to brag about. */
+/** Chat line the *other* person sees about your result; null if nothing to brag about. */
 export function gameResultText(name: string, s: GameScore): string | null {
   if (!s.score) return null;
   if (s.game === "billiards" && s.score < 0) {

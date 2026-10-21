@@ -9,13 +9,19 @@ import cors from "cors";
 import express from "express";
 import { Server } from "socket.io";
 import {
+  CHAT_MAX,
+  CHAT_RATE,
+  CHAT_WINDOW_MS,
   GAME_IDS,
   NAME_MAX,
+  SCHOOL_IDS,
   SKIP_COOLDOWN_MS,
   SKIP_LIMIT,
   SKIP_WINDOW_MS,
   TAGS,
   type ClientToServerEvents,
+  type FriendStatus,
+  type ReportReason,
   type ServerToClientEvents,
 } from "@stranger/shared";
 import { dequeue, enqueue, queueSize } from "./matchmaker.js";
@@ -23,7 +29,6 @@ import { banUntil, report } from "./moderation.js";
 import {
   createRoom,
   endRoom,
-  handleCardNext,
   handleConnect,
   handleExtend,
   handleReveal,
@@ -74,8 +79,10 @@ function cleanName(raw: string) {
   return name || "Người lạ";
 }
 
+const REPORT_REASONS: ReportReason[] = ["nsfw", "harass", "spam", "other"];
+
 io.on("connection", (socket) => {
-  socket.on("hello", ({ deviceId, name, tags, blocked }) => {
+  socket.on("hello", ({ deviceId, name, tags, school, blocked }) => {
     if (typeof deviceId !== "string" || deviceId.length < 8 || deviceId.length > 64) {
       socket.disconnect(true);
       return;
@@ -95,12 +102,14 @@ io.on("connection", (socket) => {
       deviceId,
       name: cleanName(name),
       tags: (Array.isArray(tags) ? tags : []).filter((t) => (TAGS as readonly string[]).includes(t)),
+      school: typeof school === "string" && SCHOOL_IDS.includes(school) ? school : null,
       blocked: new Set(Array.isArray(blocked) ? blocked.slice(0, 500) : []),
       roomId: null,
       queuedAt: null,
       priority: false,
       cooldownTimer: null,
       game: null,
+      chatAt: [],
     };
     users.set(socket.id, user);
     socketByDevice.set(deviceId, socket.id);
@@ -153,7 +162,19 @@ io.on("connection", (socket) => {
   socket.on("room:reveal", () => me() && handleReveal(me()!));
   socket.on("room:extend", () => me() && handleExtend(me()!));
   socket.on("room:connect", () => me() && handleConnect(me()!));
-  socket.on("room:card:next", () => me() && handleCardNext(me()!));
+
+  socket.on("room:chat", (payload) => {
+    const u = me();
+    const room = u && roomOf(u);
+    if (!u || !room) return;
+    const text = String(payload?.text ?? "").replace(/\s+/g, " ").trim().slice(0, CHAT_MAX);
+    if (!text) return;
+    const now = Date.now();
+    u.chatAt = u.chatAt.filter((t) => now - t < CHAT_WINDOW_MS);
+    if (u.chatAt.length >= CHAT_RATE) return;
+    u.chatAt.push(now);
+    users.get(peerOf(room, socket.id))?.socket.emit("room:chat", { text, at: now });
+  });
 
   socket.on("room:next", () => {
     const u = me();
@@ -171,14 +192,17 @@ io.on("connection", (socket) => {
     broadcastPresence();
   });
 
-  socket.on("room:report", () => {
+  socket.on("room:report", (payload) => {
     const u = me();
     const room = u && roomOf(u);
     if (!u || !room) return;
     const target = users.get(peerOf(room, socket.id));
     endRoom(room, "reported", "peer-left", socket.id);
     if (!target) return;
-    const until = report(u.deviceId, target.deviceId);
+    // The client keeps its own block list too, but only sends it on `hello`.
+    u.blocked.add(target.deviceId);
+    const reason = REPORT_REASONS.includes(payload?.reason) ? payload.reason : "other";
+    const until = report(u.deviceId, target.deviceId, reason);
     if (until) {
       target.socket.emit("banned", { until });
       target.socket.disconnect(true);
@@ -188,9 +212,13 @@ io.on("connection", (socket) => {
   socket.on("friend:invite", ({ deviceId }) => {
     const u = me();
     if (!u || u.roomId) return;
-    const target = userByDevice(deviceId);
-    if (!target || target.roomId || target.blocked.has(u.deviceId)) return;
     const inviteId = randomUUID();
+    const target = userByDevice(deviceId);
+    if (!target || target.roomId || target.blocked.has(u.deviceId)) {
+      // Answer right away so the caller's button doesn't stay stuck on "pending".
+      socket.emit("friend:invite:result", { inviteId, accepted: false });
+      return;
+    }
     invites.set(inviteId, { from: u.deviceId, to: target.deviceId, at: Date.now() });
     target.socket.emit("friend:invite", { inviteId, from: publicInfo(u) });
     setTimeout(() => {
@@ -224,9 +252,12 @@ io.on("connection", (socket) => {
   });
 
   socket.on("friend:status", ({ deviceIds }) => {
-    const online: Record<string, boolean> = {};
-    for (const id of (deviceIds ?? []).slice(0, 200)) online[id] = !!userByDevice(id);
-    socket.emit("friend:status", { online });
+    const status: Record<string, FriendStatus> = {};
+    for (const id of (deviceIds ?? []).slice(0, 200)) {
+      const f = userByDevice(id);
+      status[id] = !f ? "offline" : f.roomId ? "busy" : "online";
+    }
+    socket.emit("friend:status", { status });
   });
 
   socket.on("disconnect", () => {

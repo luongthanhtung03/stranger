@@ -2,22 +2,34 @@
 
 import confetti from "canvas-confetti";
 import { AnimatePresence, motion } from "framer-motion";
-import { Eye, Flag, Heart, Leaf, Mic, MicOff, PhoneOff, SkipForward, Video, VideoOff } from "lucide-react";
+import {
+  Eye,
+  Flag,
+  Heart,
+  Leaf,
+  MessageCircle,
+  Mic,
+  MicOff,
+  PhoneOff,
+  SkipForward,
+  Video,
+  VideoOff,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   EXTEND_MS,
   EXTEND_PROMPT_MS,
   NEXT_LOCK_MS,
-  type Icebreaker,
   type PeerInfo,
   type ReportReason,
   type RtcSignal,
 } from "@stranger/shared";
-import { IcebreakerCard } from "./IcebreakerCard";
+import { ChatPanel } from "./ChatPanel";
 import { MatchIntro } from "./MatchIntro";
 import { QualityBadge } from "./QualityBadge";
 import { ReportDialog } from "./ReportDialog";
 import { RoundTimer } from "./RoundTimer";
+import { SchoolBadge } from "./SchoolPicker";
 import { Toast } from "./Toast";
 import { t } from "@/i18n/vi";
 import { addBlocked, addFriend, getName } from "@/lib/identity";
@@ -42,7 +54,9 @@ export function Room({ match }: { match: Match }) {
   const [reveal, setReveal] = useState({ me: false, peer: false, revealed: match.private });
   const [endsAt, setEndsAt] = useState(match.endsAt);
   const [extend, setExtend] = useState({ me: false, peer: false });
-  const [card, setCard] = useState<Icebreaker | null>(match.card);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatUnread, setChatUnread] = useState(false);
+  const chatOpenRef = useRef(false);
   const [connectPressed, setConnectPressed] = useState(false);
   const [connectedPeer, setConnectedPeer] = useState<PeerInfo | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -111,7 +125,6 @@ export function Room({ match }: { match: Match }) {
     const onReveal = (s: { me: boolean; peer: boolean; revealed: boolean }) => setReveal(s);
     const onTimer = ({ endsAt }: { endsAt: number }) => setEndsAt(endsAt);
     const onExtend = (s: { me: boolean; peer: boolean }) => setExtend(s);
-    const onCard = ({ card }: { card: Icebreaker }) => setCard(card);
     const onConnected = ({ peer }: { peer: PeerInfo }) => {
       addFriend(peer);
       setConnectedPeer(peer);
@@ -121,13 +134,11 @@ export function Room({ match }: { match: Match }) {
     socket.on("room:reveal:state", onReveal);
     socket.on("room:timer", onTimer);
     socket.on("room:extend:state", onExtend);
-    socket.on("room:card", onCard);
     socket.on("room:connected", onConnected);
     return () => {
       socket.off("room:reveal:state", onReveal);
       socket.off("room:timer", onTimer);
       socket.off("room:extend:state", onExtend);
-      socket.off("room:card", onCard);
       socket.off("room:connected", onConnected);
     };
   }, [socket, showToast]);
@@ -141,18 +152,26 @@ export function Room({ match }: { match: Match }) {
     };
   }, []);
 
-  // --- Auto-hiding controls -------------------------------------------------
+  // --- Auto-hiding controls (kept up while the chat is open) ----------------
+  const hideLater = useCallback(() => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(() => !chatOpenRef.current && setControls(false), CONTROLS_HIDE_MS);
+  }, []);
   const poke = useCallback(() => {
     setControls(true);
-    if (hideTimer.current) clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => setControls(false), CONTROLS_HIDE_MS);
-  }, []);
+    hideLater();
+  }, [hideLater]);
   useEffect(() => {
-    hideTimer.current = setTimeout(() => setControls(false), CONTROLS_HIDE_MS);
+    hideLater();
     return () => {
       if (hideTimer.current) clearTimeout(hideTimer.current);
     };
-  }, []);
+  }, [hideLater]);
+  const toggleChat = () => {
+    chatOpenRef.current = !chatOpen;
+    setChatOpen(!chatOpen);
+    if (chatOpen) hideLater();
+  };
 
   // --- Actions ---------------------------------------------------------------
   const doReveal = () => {
@@ -184,14 +203,17 @@ export function Room({ match }: { match: Match }) {
     setReportOpen(false);
     addBlocked(match.peer.deviceId);
     socket.emit("room:report", { reason });
-    joinQueue();
+    // A call-again room came from the friends list; don't drop into random matching.
+    if (match.private) clearMatch();
+    else joinQueue();
   };
 
   const showExtend = !!endsAt && endsAt - now <= EXTEND_PROMPT_MS && endsAt - now > 0;
   const blurred = !reveal.revealed;
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden bg-black" onPointerDown={poke} onPointerMove={poke}>
+    // Always dark: every overlay here sits on top of video.
+    <div data-theme="dark" className="relative h-dvh w-full overflow-hidden bg-black text-fg" onPointerDown={poke} onPointerMove={poke}>
       {/* Remote video */}
       <motion.video
         ref={remoteRef}
@@ -241,6 +263,7 @@ export function Room({ match }: { match: Match }) {
         <div className="glass flex items-center gap-2 rounded-full py-1.5 pl-2 pr-3">
           <span className="h-2 w-2 rounded-full bg-emerald-400 breathe" />
           <span className="text-sm font-bold">{match.peer.name}</span>
+          <SchoolBadge id={match.peer.school} />
           {match.peer.tags.slice(0, 2).map((tag) => (
             <span key={tag} className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-fg/80">
               {tag}
@@ -255,7 +278,7 @@ export function Room({ match }: { match: Match }) {
         <QualityBadge stats={stats} state={connState} />
       </div>
 
-      {/* Bottom: extend prompt + icebreaker + controls */}
+      {/* Bottom: extend prompt + chat + controls */}
       <div className="absolute inset-x-0 bottom-0 z-20 mx-auto flex max-w-[560px] flex-col gap-3 px-3 pb-[max(14px,env(safe-area-inset-bottom))]">
         <AnimatePresence>
           {showExtend && (
@@ -278,7 +301,7 @@ export function Room({ match }: { match: Match }) {
             </motion.div>
           )}
         </AnimatePresence>
-        <IcebreakerCard card={card} onNext={() => socket.emit("room:card:next")} />
+        <ChatPanel socket={socket} brag={match.brag} open={chatOpen} now={now} onUnread={setChatUnread} />
 
         <AnimatePresence>
           {controls && hint && (
@@ -326,6 +349,10 @@ export function Room({ match }: { match: Match }) {
                   <Heart size={20} fill={connectPressed ? "currentColor" : "none"} />
                 </motion.span>
               </Ctl>
+              <Ctl onHover={setHint} onClick={toggleChat} active={chatOpen} label={t.chat}>
+                <MessageCircle size={20} />
+                {chatUnread && !chatOpen && <Dot />}
+              </Ctl>
               <Ctl onHover={setHint} onClick={() => media.setDataSaver(!media.dataSaver)} active={media.dataSaver} label={t.dataSaver}>
                 <Leaf size={20} />
               </Ctl>
@@ -355,7 +382,7 @@ export function Room({ match }: { match: Match }) {
         </AnimatePresence>
       </div>
 
-      <AnimatePresence>{intro && <MatchIntro me={getName()} peer={match.peer.name} />}</AnimatePresence>
+      <AnimatePresence>{intro && <MatchIntro me={getName()} peer={match.peer.name} school={match.peer.school} />}</AnimatePresence>
       <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} onReport={doReport} />
       <Toast message={toast} />
     </div>

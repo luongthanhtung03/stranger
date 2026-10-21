@@ -32,7 +32,7 @@ export function ReportDialog({
             transition={{ type: "spring", stiffness: 380, damping: 34 }}
             className="glass fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[480px] rounded-t-3xl p-5 pb-[max(20px,env(safe-area-inset-bottom))]"
           >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-chip-strong" />
             <h3 className="mb-3 text-lg font-extrabold">{t.reportTitle}</h3>
             <div className="flex flex-col gap-2">
               {reasons.map((r) => (

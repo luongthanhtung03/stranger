@@ -5,12 +5,11 @@ import { io, type Socket } from "socket.io-client";
 import type {
   ClientToServerEvents,
   IceServer,
-  Icebreaker,
   PeerInfo,
   RoomEndReason,
   ServerToClientEvents,
 } from "@stranger/shared";
-import { getBlocked, getDeviceId, getName, getTags } from "./identity";
+import { getBlocked, getDeviceId, getName, getSchool, getTags } from "./identity";
 
 export type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -21,7 +20,7 @@ export interface Match {
   iceServers: IceServer[];
   endsAt: number;
   private: boolean;
-  card: Icebreaker;
+  brag: string | null;
 }
 
 export interface Invite {
@@ -51,6 +50,16 @@ const SocketCtx = createContext<Ctx | null>(null);
 
 const URL = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:4000";
 
+function sendHello(socket: AppSocket) {
+  socket.emit("hello", {
+    deviceId: getDeviceId(),
+    name: getName(),
+    tags: getTags(),
+    school: getSchool(),
+    blocked: getBlocked(),
+  });
+}
+
 export function SocketProvider({ children }: { children: React.ReactNode }) {
   const socket = useMemo<AppSocket>(
     () => io(URL, { autoConnect: false, transports: ["websocket", "polling"] }),
@@ -68,13 +77,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   const queuedRef = useRef(false);
 
   useEffect(() => {
-    const hello = () =>
-      socket.emit("hello", {
-        deviceId: getDeviceId(),
-        name: getName(),
-        tags: getTags(),
-        blocked: getBlocked(),
-      });
+    const hello = () => sendHello(socket);
 
     const onConnect = () => {
       setConnected(true);
@@ -139,12 +142,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
   const connect = useCallback(() => {
     if (socket.connected) {
-      socket.emit("hello", {
-        deviceId: getDeviceId(),
-        name: getName(),
-        tags: getTags(),
-        blocked: getBlocked(),
-      });
+      sendHello(socket);
     } else {
       socket.connect();
     }

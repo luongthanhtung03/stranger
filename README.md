@@ -21,7 +21,7 @@ npm run dev            # web :3000 + server :4000
 
 Mở hai tab trình duyệt (một tab ẩn danh để có deviceId khác) → nhập tên → Bắt đầu.
 
-Test server: `cd apps/server && npm run dev` rồi `node test/signaling.test.mjs` (mặc định trỏ tới :4010, đặt `URL=http://localhost:4000` nếu cần).
+Test server: `cd apps/server && npm run dev` rồi `npx tsx test/signaling.test.mjs` (mặc định trỏ tới :4010, đặt `URL=http://localhost:4000` nếu cần).
 
 ## Cho bạn bè vào thử (tunnel)
 

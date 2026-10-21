@@ -1,12 +1,21 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { Camera, Users } from "lucide-react";
+import { Camera, ChevronDown, GraduationCap, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { NAME_MAX, TAGS } from "@stranger/shared";
+import { NAME_MAX, TAGS, schoolById } from "@stranger/shared";
+import { SchoolPicker } from "./SchoolPicker";
+import { ThemeToggle } from "./ThemeToggle";
 import { t } from "@/i18n/vi";
-import { getName, getTags, setName as persistName, setTags as persistTags } from "@/lib/identity";
+import {
+  getName,
+  getSchool,
+  getTags,
+  setName as persistName,
+  setSchool as persistSchool,
+  setTags as persistTags,
+} from "@/lib/identity";
 import { useMedia } from "@/lib/media-context";
 import { useSocket } from "@/lib/socket";
 
@@ -24,6 +33,8 @@ export function Landing() {
   const { presence, connect, joinQueue, connected } = useSocket();
   const [name, setName] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  const [school, setSchool] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -32,6 +43,7 @@ export function Landing() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setName(getName());
     setTags(getTags());
+    setSchool(getSchool());
     setHydrated(true);
     connect(); // presence count + invites while on the landing page
   }, [connect]);
@@ -48,6 +60,13 @@ export function Landing() {
 
   const toggleTag = (tag: string) =>
     setTags((cur) => (cur.includes(tag) ? cur.filter((x) => x !== tag) : [...cur, tag].slice(0, 4)));
+
+  const pickSchool = (id: string | null) => {
+    setSchool(id);
+    persistSchool(id);
+    setPickerOpen(false);
+  };
+  const schoolInfo = schoolById(school);
 
   const canStart = name.trim().length > 0 && !!media.stream;
 
@@ -75,6 +94,7 @@ export function Landing() {
             <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-400 breathe" : "bg-muted"}`} />
             {t.online(presence.online)}
           </span>
+          <ThemeToggle />
           <Link href="/friends" aria-label={t.friends} className="glass rounded-full p-2 text-fg/80">
             <Users size={18} />
           </Link>
@@ -123,6 +143,27 @@ export function Landing() {
             autoComplete="off"
             className="w-full rounded-2xl border border-line bg-surface px-4 py-3.5 text-base font-medium outline-none transition-shadow focus:border-accent/60 focus:shadow-[0_0_0_4px_rgba(124,58,237,0.25)]"
           />
+          <motion.button
+            whileTap={{ scale: 0.96 }}
+            onClick={() => setPickerOpen(true)}
+            className={`mt-2 flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+              schoolInfo ? "border-accent/50 bg-accent/10 font-bold text-fg" : "border-line bg-surface text-muted"
+            }`}
+          >
+            <GraduationCap size={16} className={schoolInfo ? "text-accent" : ""} />
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={school ?? "none"}
+                initial={{ y: 8, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -8, opacity: 0 }}
+                transition={{ duration: 0.18 }}
+              >
+                {schoolInfo ? schoolInfo.name : t.school}
+              </motion.span>
+            </AnimatePresence>
+            <ChevronDown size={14} />
+          </motion.button>
         </motion.div>
 
         <motion.div variants={rise}>
@@ -160,6 +201,7 @@ export function Landing() {
           </motion.button>
         </motion.div>
       </div>
+      <SchoolPicker open={pickerOpen} value={school} onClose={() => setPickerOpen(false)} onPick={pickSchool} />
     </motion.main>
   );
 }

@@ -1,17 +1,7 @@
 import { randomUUID } from "node:crypto";
-import {
-  CARD_INTERVAL_MS,
-  EXTEND_MS,
-  ROUND_MS,
-  gameResultText,
-  type Icebreaker,
-  type RoomEndReason,
-} from "@stranger/shared";
-import { pickCard } from "./icebreakers.js";
+import { EXTEND_MS, ROUND_MS, gameResultText, type RoomEndReason } from "@stranger/shared";
 import { getIceServers } from "./turn.js";
 import { peerOf, publicInfo, rooms, users, type Room, type User } from "./state.js";
-
-const lastCard = new Map<string, string>(); // roomId -> card id
 
 export async function createRoom(a: User, b: User, isPrivate: boolean): Promise<Room> {
   const room: Room = {
@@ -23,7 +13,6 @@ export async function createRoom(a: User, b: User, isPrivate: boolean): Promise<
     extend: new Set(),
     connect: new Set(),
     endTimer: null,
-    cardTimer: null,
   };
   rooms.set(room.id, room);
   a.roomId = room.id;
@@ -32,15 +21,11 @@ export async function createRoom(a: User, b: User, isPrivate: boolean): Promise<
   b.queuedAt = null;
 
   const iceServers = await getIceServers();
-  // The first card rides along with the match: a separate event right after
-  // would arrive before the client's room listeners exist.
-  const card = pickCard();
-  lastCard.set(room.id, card.id);
-  room.cardTimer = setInterval(() => sendCard(room), CARD_INTERVAL_MS);
   const base = { roomId: room.id, iceServers, endsAt: room.endsAt, private: isPrivate };
-  // A mini-game result from the queue beats the random card as an opener.
-  a.socket.emit("room:matched", { ...base, card: braggingCard(b) ?? card, peer: publicInfo(b), initiator: true });
-  b.socket.emit("room:matched", { ...base, card: braggingCard(a) ?? card, peer: publicInfo(a), initiator: false });
+  // The brag rides along with the match: a separate event right after would
+  // arrive before the client's room listeners exist.
+  a.socket.emit("room:matched", { ...base, brag: brag(b), peer: publicInfo(b), initiator: true });
+  b.socket.emit("room:matched", { ...base, brag: brag(a), peer: publicInfo(a), initiator: false });
   a.game = null;
   b.game = null;
 
@@ -48,9 +33,8 @@ export async function createRoom(a: User, b: User, isPrivate: boolean): Promise<
   return room;
 }
 
-function braggingCard(u: User): Icebreaker | null {
-  const text = u.game && gameResultText(u.name, u.game);
-  return text ? { id: `game-${u.deviceId}`, category: "funny", text } : null;
+function brag(u: User): string | null {
+  return u.game ? gameResultText(u.name, u.game) : null;
 }
 
 function scheduleEnd(room: Room) {
@@ -58,14 +42,6 @@ function scheduleEnd(room: Room) {
   room.endTimer = null;
   if (!room.endsAt) return;
   room.endTimer = setTimeout(() => endRoom(room, "timer", "timer"), room.endsAt - Date.now());
-}
-
-function sendCard(room: Room) {
-  if (room.cardTimer) clearInterval(room.cardTimer);
-  const card = pickCard(lastCard.get(room.id));
-  lastCard.set(room.id, card.id);
-  emitBoth(room, (s) => s.emit("room:card", { card }));
-  room.cardTimer = setInterval(() => sendCard(room), CARD_INTERVAL_MS);
 }
 
 function emitBoth(room: Room, fn: (s: User["socket"]) => void) {
@@ -84,9 +60,7 @@ export function endRoom(
 ) {
   if (!rooms.has(room.id)) return;
   rooms.delete(room.id);
-  lastCard.delete(room.id);
   if (room.endTimer) clearTimeout(room.endTimer);
-  if (room.cardTimer) clearInterval(room.cardTimer);
   for (const sid of room.members) {
     const u = users.get(sid);
     if (!u) continue;
@@ -147,9 +121,4 @@ export function handleConnect(user: User) {
     const peer = users.get(peerOf(room, sid));
     if (me && peer) me.socket.emit("room:connected", { peer: publicInfo(peer) });
   }
-}
-
-export function handleCardNext(user: User) {
-  const room = roomOf(user);
-  if (room) sendCard(room);
 }

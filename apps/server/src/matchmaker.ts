@@ -38,13 +38,15 @@ function compatible(a: User, b: User) {
   return !last || Date.now() - last > REMATCH_COOLDOWN_MS;
 }
 
-function sharedTags(a: User, b: User) {
-  return a.tags.filter((t) => b.tags.includes(t)).length;
+/** Shared tags, plus a bonus for the same (real) school. Only ranks candidates. */
+function affinity(a: User, b: User) {
+  const sameSchool = a.school && a.school !== "other" && a.school === b.school;
+  return a.tags.filter((t) => b.tags.includes(t)).length + (sameSchool ? 2 : 0);
 }
 
 let matching = false;
 
-/** Pairs the longest-waiting user with the compatible candidate sharing the most tags. */
+/** Pairs the longest-waiting user with the compatible candidate with the highest affinity. */
 export async function tryMatch() {
   if (matching) return;
   matching = true;
@@ -64,7 +66,7 @@ export async function tryMatch() {
         const cand = users.get(queue[i]);
         if (!cand) continue;
         if (!compatible(head, cand)) continue;
-        const score = sharedTags(head, cand);
+        const score = affinity(head, cand);
         if (score > bestScore) {
           best = cand;
           bestScore = score;

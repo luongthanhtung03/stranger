@@ -10,7 +10,7 @@ import { useSocket } from "@/lib/socket";
 
 // Full-screen play layer over the queue screen. Picks a random game per visit
 // (never the same one twice in a row) and reports the score to the server so
-// the partner's first card can be about it.
+// the partner's chat can open with it.
 
 const LAST_KEY = "stranger.lastGame";
 
@@ -70,7 +70,7 @@ export function QueueGame() {
       >
         <span>{meta.emoji}</span>
         <span>{meta.title}</span>
-        <span className="rounded-full bg-white/10 px-2 tabular-nums">{score}</span>
+        <span className="rounded-full bg-chip px-2 tabular-nums">{score}</span>
       </motion.div>
 
       <AnimatePresence>

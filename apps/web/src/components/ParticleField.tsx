@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useTheme } from "@/lib/theme";
 
 // Ambient "people out there" background: drifting dots that link up when
 // close, get pulled toward the cursor/finger, plus a soft glow that follows it.
+// Dark theme: a warm additive "flashlight". Light theme: additive light would
+// vanish on a pale background, so the glow becomes a violet tint instead.
 
 const LINK_DIST = 120;
 const PULL_DIST = 240;
@@ -18,9 +21,20 @@ interface P {
   pink: boolean;
 }
 
+// Lit colors per theme, as "r, g, b" so alpha can vary per frame.
+const LIT = {
+  dark: { glow: ["255, 241, 190", "255, 225, 160", "255, 220, 150"], link: "255, 236, 190", dot: "255, 240, 200", blend: "lighter" },
+  light: { glow: ["124, 58, 237", "168, 85, 247", "236, 72, 153"], link: "109, 40, 217", dot: "91, 33, 182", blend: "source-over" },
+} as const;
+
 export function ParticleField() {
   const ref = useRef<HTMLCanvasElement>(null);
   const lightRef = useRef<HTMLDivElement>(null);
+  const { theme } = useTheme();
+  const themeRef = useRef(theme);
+  useEffect(() => {
+    themeRef.current = theme;
+  }, [theme]);
 
   useEffect(() => {
     const canvas = ref.current;
@@ -80,6 +94,8 @@ export function ParticleField() {
 
     const frame = () => {
       ctx.clearRect(0, 0, w, h);
+      const lit = LIT[themeRef.current];
+      const glowA = themeRef.current === "light" ? 0.4 : 1;
 
       // Warm light around the pointer (eased for a silky feel), drawn additively
       // so it brightens whatever is underneath instead of tinting it.
@@ -87,16 +103,16 @@ export function ParticleField() {
         mouse.x += (mouse.tx - mouse.x) * 0.18;
         mouse.y += (mouse.ty - mouse.y) * 0.18;
         const g = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, LIGHT_R);
-        g.addColorStop(0, "rgba(255, 241, 190, 0.5)");
-        g.addColorStop(0.35, "rgba(255, 225, 160, 0.18)");
-        g.addColorStop(1, "rgba(255, 220, 150, 0)");
-        ctx.globalCompositeOperation = "lighter";
+        g.addColorStop(0, `rgba(${lit.glow[0]}, ${0.5 * glowA})`);
+        g.addColorStop(0.35, `rgba(${lit.glow[1]}, ${0.18 * glowA})`);
+        g.addColorStop(1, `rgba(${lit.glow[2]}, 0)`);
+        ctx.globalCompositeOperation = lit.blend;
         ctx.fillStyle = g;
         ctx.fillRect(mouse.x - LIGHT_R, mouse.y - LIGHT_R, LIGHT_R * 2, LIGHT_R * 2);
         ctx.globalCompositeOperation = "source-over";
       }
       // 0..1 — how close a point is to the light; dots and links near it glow.
-      const lit = (x: number, y: number) =>
+      const litness = (x: number, y: number) =>
         mouse.active ? Math.max(0, 1 - Math.hypot(x - mouse.x, y - mouse.y) / LIGHT_R) : 0;
 
       for (const p of particles) {
@@ -135,9 +151,9 @@ export function ParticleField() {
           const dy = a.y - b.y;
           const d2 = dx * dx + dy * dy;
           if (d2 > LINK_DIST * LINK_DIST) continue;
-          const near = lit((a.x + b.x) / 2, (a.y + b.y) / 2);
+          const near = litness((a.x + b.x) / 2, (a.y + b.y) / 2);
           const alpha = (1 - Math.sqrt(d2) / LINK_DIST) * (0.1 + near * 0.5);
-          ctx.strokeStyle = near > 0.05 ? `rgba(255, 236, 190, ${alpha})` : `rgba(167, 139, 250, ${alpha})`;
+          ctx.strokeStyle = near > 0.05 ? `rgba(${lit.link}, ${alpha})` : `rgba(167, 139, 250, ${alpha})`;
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
           ctx.lineTo(b.x, b.y);
@@ -147,11 +163,11 @@ export function ParticleField() {
 
       // Dots
       for (const p of particles) {
-        const near = lit(p.x, p.y);
+        const near = litness(p.x, p.y);
         const alpha = 0.35 + near * 0.65;
         ctx.fillStyle =
           near > 0.05
-            ? `rgba(255, 240, 200, ${alpha})`
+            ? `rgba(${lit.dot}, ${alpha})`
             : p.pink
               ? `rgba(236, 72, 153, ${alpha})`
               : `rgba(167, 139, 250, ${alpha})`;
@@ -196,9 +212,11 @@ export function ParticleField() {
         style={{
           width: LIGHT_R * 2,
           height: LIGHT_R * 2,
-          mixBlendMode: "screen",
+          mixBlendMode: theme === "light" ? "multiply" : "screen",
           background:
-            "radial-gradient(circle, rgba(255,241,190,0.38) 0%, rgba(255,225,160,0.14) 35%, rgba(255,220,150,0) 70%)",
+            theme === "light"
+              ? "radial-gradient(circle, rgba(196,170,255,0.35) 0%, rgba(236,190,240,0.14) 35%, rgba(255,255,255,0) 70%)"
+              : "radial-gradient(circle, rgba(255,241,190,0.38) 0%, rgba(255,225,160,0.14) 35%, rgba(255,220,150,0) 70%)",
         }}
       />
     </>

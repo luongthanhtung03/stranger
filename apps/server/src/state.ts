@@ -1,5 +1,5 @@
 import type { Server, Socket } from "socket.io";
-import type { ClientToServerEvents, GameScore, ServerToClientEvents, Tag } from "@stranger/shared";
+import type { ClientToServerEvents, GameScore, PeerInfo, ServerToClientEvents, Tag } from "@stranger/shared";
 
 export type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 export type Sock = Socket<ClientToServerEvents, ServerToClientEvents>;
@@ -9,6 +9,7 @@ export interface User {
   deviceId: string;
   name: string;
   tags: Tag[];
+  school: string | null;
   blocked: Set<string>;
   roomId: string | null;
   queuedAt: number | null;
@@ -16,6 +17,8 @@ export interface User {
   priority: boolean;
   cooldownTimer: NodeJS.Timeout | null;
   game: GameScore | null;
+  /** Recent chat timestamps, for rate limiting. */
+  chatAt: number[];
 }
 
 export interface Room {
@@ -27,7 +30,6 @@ export interface Room {
   extend: Set<string>;
   connect: Set<string>;
   endTimer: NodeJS.Timeout | null;
-  cardTimer: NodeJS.Timeout | null;
 }
 
 export const users = new Map<string, User>(); // socket id -> user
@@ -43,6 +45,6 @@ export function peerOf(room: Room, socketId: string): string {
   return room.members[0] === socketId ? room.members[1] : room.members[0];
 }
 
-export function publicInfo(u: User) {
-  return { deviceId: u.deviceId, name: u.name, tags: u.tags };
+export function publicInfo(u: User): PeerInfo {
+  return { deviceId: u.deviceId, name: u.name, tags: u.tags, school: u.school };
 }

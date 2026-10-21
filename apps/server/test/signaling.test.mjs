@@ -1,7 +1,7 @@
-// Integration test for the signaling server: matching, cards, reveal, extend,
+// Integration test for the signaling server: matching, chat, reveal, extend,
 // connect, next, report/ban, friend invites. Run with the server on PORT.
 import { io } from "socket.io-client";
-import { EXTEND_MS, ROUND_MS, SKIP_LIMIT } from "@stranger/shared";
+import { CHAT_MAX, CHAT_RATE, EXTEND_MS, ROUND_MS, SKIP_LIMIT } from "@stranger/shared";
 
 const URL = process.env.URL ?? "http://localhost:4010";
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -19,17 +19,17 @@ const once = (s, ev, ms = 3000) =>
     });
   });
 
-function client(name, tags = [], blocked = []) {
+function client(name, tags = [], blocked = [], school = null) {
   const s = io(URL, { transports: ["websocket"] });
   const deviceId = `dev-${name}-${Math.random().toString(36).slice(2, 8)}`;
-  s.on("connect", () => s.emit("hello", { deviceId, name, tags, blocked }));
+  s.on("connect", () => s.emit("hello", { deviceId, name, tags, school, blocked }));
   s.deviceId = deviceId;
   return s;
 }
 
 // --- 1. matching + room events ---------------------------------------------
-const a = client("An", ["game"]);
-const b = client("Bình", ["game"]);
+const a = client("An", ["game"], [], "uet");
+const b = client("Bình", ["game"], [], "not-a-school");
 await wait(300);
 const [ma, mb] = await Promise.all([once(a, "room:matched"), once(b, "room:matched"), a.emit("queue:join"), b.emit("queue:join")]);
 ok(ma.roomId === mb.roomId, "both get the same room");
@@ -38,8 +38,36 @@ ok(ma.peer.name === "Bình" && mb.peer.name === "An", "peer info exchanged");
 ok(Array.isArray(ma.iceServers) && ma.iceServers.length > 0, "ice servers provided");
 ok(ma.endsAt > Date.now() + ROUND_MS - 2000, "round timer set");
 
-ok(ma.card && ma.card.id === mb.card.id, "same first icebreaker card for both (in room:matched)");
-const ca = { card: ma.card };
+ok(mb.peer.school === "uet" && ma.peer.school === null, "school passed through, invalid id -> null");
+ok(!("card" in ma) && ma.brag === null, "no icebreaker card; no brag without a game score");
+
+// chat: relayed to the peer only, cleaned, rate limited
+let echoed = false;
+a.once("room:chat", () => (echoed = true));
+const chat1 = once(b, "room:chat");
+a.emit("room:chat", { text: "  xin   chào  " });
+ok((await chat1).text === "xin chào", "chat relayed to peer with whitespace collapsed");
+ok(!echoed, "chat not echoed to sender");
+const chatLong = once(b, "room:chat");
+a.emit("room:chat", { text: "x".repeat(CHAT_MAX + 50) });
+ok((await chatLong).text.length === CHAT_MAX, "chat capped at CHAT_MAX");
+let got = 0;
+const count = () => got++;
+b.on("room:chat", count);
+for (let i = 0; i < CHAT_RATE + 3; i++) a.emit("room:chat", { text: `m${i}` });
+await wait(300);
+b.off("room:chat", count);
+ok(got === CHAT_RATE - 2, `chat rate limited (${got} of ${CHAT_RATE + 3} delivered after 2 earlier)`);
+
+// friend:status says "busy" while in a room
+const sx = client("Watcher");
+await wait(200);
+sx.emit("friend:status", { deviceIds: [a.deviceId] });
+ok((await once(sx, "friend:status")).status[a.deviceId] === "busy", "friend:status reports busy in a room");
+// inviting a busy friend is answered right away
+sx.emit("friend:invite", { deviceId: a.deviceId });
+ok((await once(sx, "friend:invite:result", 1000)).accepted === false, "invite to busy friend -> accepted:false at once");
+sx.disconnect();
 
 // signaling relay
 b.once("rtc:signal", (sig) => ok(sig.type === "ice" && sig.candidate.candidate === "x", "rtc:signal relayed to peer"));
@@ -72,12 +100,6 @@ b.emit("room:connect");
 const [cna, cnb] = await Promise.all([once(a, "room:connected"), once(b, "room:connected")]);
 ok(cna.peer.deviceId === b.deviceId && cnb.peer.deviceId === a.deviceId, "both receive room:connected with peer info");
 
-// next card
-const nc = once(b, "room:card");
-a.emit("room:card:next");
-const ncb = await nc;
-ok(ncb.card.id !== ca.card.id, "card:next sends a different card");
-
 // next → peer sees peer-next, actor sees you-left
 const endB = once(b, "room:ended");
 const endA = once(a, "room:ended");
@@ -108,7 +130,10 @@ await once(b, "room:ended");
 // friend status
 b.emit("friend:status", { deviceIds: [a.deviceId, "nobody"] });
 const st = await once(b, "friend:status");
-ok(st.online[a.deviceId] === true && st.online["nobody"] === false, "friend:status reports online map");
+ok(st.status[a.deviceId] === "online" && st.status["nobody"] === "offline", "friend:status reports status map");
+// inviting someone offline is answered right away
+b.emit("friend:invite", { deviceId: "nobody" });
+ok((await once(b, "friend:invite:result", 1000)).accepted === false, "invite to offline friend -> accepted:false at once");
 
 // --- 3. reports → ban after 3 distinct reporters ----------------------------
 const victim = client("Vic");
@@ -147,6 +172,18 @@ await wait(600);
 ok(!xy, "blocked pair is never matched");
 x.disconnect();
 y.disconnect();
+await wait(200);
+
+// --- 4b. queue mini-game score -> brag line for the partner --------------------
+const g1 = client("Gamer");
+const g2 = client("Watcher2");
+await wait(200);
+g1.emit("game:score", { game: "whack", score: 7 });
+const [mg1, mg2] = await Promise.all([once(g1, "room:matched"), once(g2, "room:matched"), g1.emit("queue:join"), g2.emit("queue:join")]);
+ok(mg2.brag?.includes("Gamer") && mg2.brag.includes("7"), "partner gets the brag line");
+ok(mg1.brag === null, "player without a score sends no brag");
+g1.disconnect();
+g2.disconnect();
 await wait(200);
 
 // --- 5. skip spam -> cooldown, skipped person gets priority ------------------
